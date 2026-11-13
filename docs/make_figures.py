@@ -161,7 +161,113 @@ def basis_correction():
     plt.close(fig)
 
 
+# ------------------------------------------------------------------ metabolite maps (illustrative MRSI)
+def brain_phantom(n=44):
+    """Synthetic axial slice: tissue labels 0=outside, 1=CSF, 2=white matter, 3=grey matter."""
+    y, x = np.mgrid[-1:1:n * 1j, -1:1:n * 1j]
+    head = (x / 0.80) ** 2 + (y / 0.95) ** 2 < 1
+    brain = (x / 0.72) ** 2 + (y / 0.87) ** 2 < 1
+    wm = (x / 0.56) ** 2 + (y / 0.71) ** 2 < 1
+    vent = (((x + 0.13) / 0.08) ** 2 + ((y + 0.05) / 0.32) ** 2 < 1) | (((x - 0.13) / 0.08) ** 2 + ((y + 0.05) / 0.32) ** 2 < 1)
+    lab = np.zeros((n, n), int)
+    lab[head] = 1
+    lab[brain] = 3
+    lab[wm] = 2
+    lab[vent] = 1
+    return lab, x, y
+
+
+def metabolite_maps_gif():
+    rng = np.random.default_rng(7)
+    lab, x, y = brain_phantom()
+    n = lab.shape[0]
+    # typical concentrations (mM) per tissue: CSF, WM, GM
+    tissue = {"NAA": (0.3, 9.0, 10.5), "Cr": (0.2, 5.8, 8.2), "PCh": (0.05, 2.1, 1.5)}
+    lesion_c = {"NAA": 3.0, "Cr": 5.0, "PCh": 4.8}               # tumour-like: NAA down, choline up
+    vmax = {"NAA": 12.0, "Cr": 9.0, "PCh": 5.0}
+    noise = {k: rng.normal(0, 0.06 * vmax[k], (n, n)) for k in tissue}
+    lesion_d = np.hypot(x - 0.30, y + 0.30)
+
+    def maps(g):
+        """Concentration maps for lesion growth g in [0, 1]."""
+        out = {}
+        w = np.clip((0.06 + 0.16 * g - lesion_d) / 0.05, 0, 1) * (lab >= 2) * (g > 0)
+        for k, (c_csf, c_wm, c_gm) in tissue.items():
+            base = np.choose(lab, [0, c_csf, c_wm, c_gm]).astype(float)
+            m = (1 - w) * base + w * lesion_c[k] + noise[k] * (lab >= 1)
+            m[lab == 0] = np.nan
+            out[k] = m
+        return out
+
+    lr = int(round((-0.30 + 1) / 2 * (n - 1)))          # row through the lesion centre
+    lc = int(round((0.30 + 1) / 2 * (n - 1)))
+    path = [(lr, c) for c in range(n) if lab[lr, c] >= 2]
+    frames = []
+    for i, (r, c) in enumerate(path):
+        g = min(1.0, i / (0.6 * len(path)))
+        frames.append((r, c, g))
+    frames += [(lr, lc, 1.0)] * 8                        # finish on the lesion
+
+    cmap = matplotlib.colormaps["turbo"].copy()
+    cmap.set_bad("#000000")
+    fig = plt.figure(figsize=(13, 4.6), dpi=78, facecolor="black")
+    gs = fig.add_gridspec(1, 4, width_ratios=[1, 1, 1, 1.9], left=0.02, right=0.98, top=0.82, bottom=0.13,
+                          wspace=0.12)
+    axm = [fig.add_subplot(gs[0, i]) for i in range(3)]
+    axs = fig.add_subplot(gs[0, 3])
+    healthy = maps(0.0)
+
+    def voxel_fid(conc):
+        return sum(conc[k] * fids[k] for k in ("NAA", "Cr", "PCh")) * np.exp(-6 * t)
+
+    ref_spec = None
+
+    def draw(i):
+        nonlocal ref_spec
+        r, c, g = frames[i]
+        mp = maps(g)
+        for ax, k in zip(axm, ("NAA", "Cr", "PCh")):
+            ax.clear()
+            ax.imshow(mp[k], cmap=cmap, vmin=0, vmax=vmax[k], interpolation="nearest")
+            ax.add_patch(plt.Rectangle((c - 0.5, r - 0.5), 1, 1, fill=False, ec="white", lw=2))
+            ax.set_title({"NAA": "NAA", "Cr": "Creatine", "PCh": "Choline"}[k], color="white", fontsize=14,
+                         weight="bold")
+            ax.axis("off")
+        conc = {k: max(mp[k][r, c], 0) if not np.isnan(mp[k][r, c]) else 0 for k in mp}
+        spec = np.real(spectrum(voxel_fid(conc)))[band]
+        if ref_spec is None:
+            ref_spec = np.real(spectrum(voxel_fid({"NAA": 10.5, "Cr": 8.2, "PCh": 2.1})))[band]
+        axs.clear()
+        axs.set_facecolor("black")
+        axs.plot(ppm[band], ref_spec, color="#6b7280", lw=1, label="healthy grey matter")
+        axs.plot(ppm[band], spec, color="#ffc627", lw=1.8, label="selected voxel")
+        top = 1.12 * max(ref_spec.max(), np.real(spectrum(voxel_fid(lesion_c)))[band].max())
+        axs.set_xlim(4.0, 1.0); axs.set_ylim(-0.08 * top, top)
+        for k, p, yy in (("NAA", 2.01, 0.93), ("Cr", 3.0, 0.93), ("Cho", 3.24, 0.82)):
+            axs.text(p, yy * top, k, ha="center", color="white", fontsize=11, weight="bold")
+        axs.set_yticks([])
+        axs.tick_params(colors="#c9ced6")
+        for s in axs.spines.values():
+            s.set_color("#4b5563")
+        axs.set_xlabel("chemical shift (ppm)", color="#c9ced6")
+        axs.set_title("spectrum in the white square", color="white", fontsize=13, loc="left")
+        axs.legend(loc="center left", fontsize=9, facecolor="black", edgecolor="#4b5563", labelcolor="white")
+        tissue_name = {0: "outside", 1: "CSF", 2: "white matter", 3: "grey matter"}[lab[r, c]]
+        in_lesion = g > 0 and lesion_d[r, c] < 0.06 + 0.16 * g and lab[r, c] >= 2
+        status = "lesion: NAA ↓  choline ↑" if in_lesion else tissue_name
+        title.set_text(f"Metabolite maps: quantify every voxel  ·  voxel = {status}")
+        title.set_color("#ff8a80" if in_lesion else "white")
+
+    title = fig.text(0.02, 0.93, "", color="white", fontsize=14, weight="bold", ha="left")
+    fig.text(0.02, 0.03, "Illustration on a synthetic brain slice (not patient data). Spectra built from "
+             "this project's basis sets.", color="#9ca3af", fontsize=9)
+
+    anim = FuncAnimation(fig, draw, frames=len(frames))
+    anim.save(OUT / "metabolite_maps.gif", writer=PillowWriter(fps=5), savefig_kwargs={"facecolor": "black"})
+    plt.close(fig)
+
+
 if __name__ == "__main__":
-    for fn in (banner, basis_correction, signal_model_gif):
+    for fn in (banner, basis_correction, signal_model_gif, metabolite_maps_gif):
         fn()
         print("done:", fn.__name__)

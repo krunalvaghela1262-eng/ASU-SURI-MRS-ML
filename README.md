@@ -26,6 +26,15 @@
 | 🧪 **Per metabolite** | Error depends strongly on the metabolite: choline, lactate and myo-inositol are easiest, **NAA and creatine** hardest |
 | 〰️ **Line broadening** | More damping hurts NAA and creatine most; the **CNN** stays the most stable across damping levels |
 
+### Why it matters
+
+Quantify the spectrum in **every voxel** of a brain scan and you get **metabolite maps**. Diseases change them: in a tumour, for example, **NAA drops** (fewer healthy neurons) and **choline rises** (fast cell-membrane turnover). The faster and more accurate the quantifier, the more useful these maps are:
+
+<p align="center">
+  <img src="docs/figures/metabolite_maps.gif" alt="Metabolite maps animation: NAA, creatine and choline" width="100%">
+  <br><sub><i>Illustration on a synthetic brain slice (not patient data). As the white square scans across, the right panel shows that voxel's spectrum, built from this project's basis sets. Inside the lesion, choline shoots up and NAA collapses.</i></sub>
+</p>
+
 ---
 
 ## 1 · The problem
