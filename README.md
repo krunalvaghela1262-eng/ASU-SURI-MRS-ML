@@ -28,11 +28,19 @@
 
 ### Why it matters
 
-Quantify the spectrum in **every voxel** of a brain scan and you get **metabolite maps**. Diseases change them: in a tumour, for example, **NAA drops** (fewer healthy neurons) and **choline rises** (fast cell-membrane turnover). The faster and more accurate the quantifier, the more useful these maps are:
+With **MR spectroscopic imaging (MRSI)**, a spectrum is recorded in thousands of small voxels across the brain. Quantifying every one of them gives **whole-brain metabolite maps**, so the quantifier has to be both accurate and fast.
+
+The maps follow brain anatomy. In a healthy brain:
+- **creatine (tCr)** is higher in grey matter, so the cortex stands out
+- **choline (tCho)** is higher in white matter
+- **NAA** is spread fairly evenly through brain tissue
+- the fluid-filled ventricles are dark in all three
+
+Clinicians look for regions that break these patterns. In a tumour, for example, NAA drops and choline rises.
 
 <p align="center">
-  <img src="docs/figures/metabolite_maps.gif" alt="Metabolite maps animation: NAA, creatine and choline" width="100%">
-  <br><sub><i>Illustration on a synthetic brain slice (not patient data). As the white square scans across, the right panel shows that voxel's spectrum, built from this project's basis sets. Inside the lesion, choline shoots up and NAA collapses.</i></sub>
+  <img src="docs/figures/metabolite_maps.gif" alt="Whole-brain metabolite maps of NAA, creatine and choline in axial, coronal and sagittal views" width="88%">
+  <br><sub><i>Simulated whole-brain MRSI (not patient data). Each voxel's concentration comes from the grey-matter / white-matter / fluid mix of the MNI152 standard brain, using literature concentrations. Voxels are ~6 mm with a little noise, and the skull base is left out as in a real acquisition. The slices sweep through the brain.</i></sub>
 </p>
 
 ---
@@ -166,7 +174,7 @@ docs/                 training pipeline notes, figures, and the script that gene
 | `mrs_model_metrics_*.csv`, `overall_metrics.csv`, `nmse_snr_bins.csv` | numeric results |
 | **`docs/`** | |
 | `pipeline.md` | how the training and evaluation were run on ASU's research computing cluster |
-| `make_figures.py` | regenerates the README figures from the basis sets |
+| `make_figures.py` | regenerates the README figures from the basis sets (the metabolite-map animation needs `pip install nilearn` for the MNI152 template) |
 
 </details>
 
@@ -175,3 +183,5 @@ docs/                 training pipeline notes, figures, and the script that gene
 ## Acknowledgements
 
 This work was done during the **Summer Research Internship (SURI) 2026** at the Ira A. Fulton Schools of Engineering, Arizona State University (selected as one of 30 from 1500+ applicants), under the mentorship of **Prof. Vikram Kodibagkar**. Training ran on ASU Research Computing. Basis sets were simulated with [MRSCloud](https://doi.org/10.1002/mrm.29370). The unsupervised ConvNet baseline is from [Shamaei et al.](https://www.biorxiv.org/content/10.1101/2022.10.13.512064v1).
+
+The metabolite-map illustration uses the ICBM 2009 MNI152 template and tissue maps (via [nilearn](https://nilearn.github.io)): Copyright (C) 1993–2009 Louis Collins, McConnell Brain Imaging Centre, Montreal Neurological Institute, McGill University.
