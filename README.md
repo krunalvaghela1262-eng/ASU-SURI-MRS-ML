@@ -71,7 +71,7 @@ flowchart LR
 
 | Model | Type | Idea |
 |---|---|---|
-| **ConvNet** | unsupervised | encoder predicts the amounts and distortions; a physics decoder rebuilds the spectrum and the network learns by matching it ([Shamaei et al.](https://github.com/isi-nmr/Deep-MRS-Quantification)) |
+| **ConvNet** | unsupervised | encoder predicts the amounts and distortions; a physics decoder rebuilds the spectrum and the network learns by matching it ([Shamaei et al.](https://www.biorxiv.org/content/10.1101/2022.10.13.512064v1)) |
 | **CNN** | supervised | 1-D convolutional network trained directly on true amounts |
 | **PINN** | supervised + physics | CNN whose loss also rebuilds the spectrum from the predicted parameters |
 | **SVM** | classical ML | support-vector regression on the spectrum |
@@ -165,4 +165,4 @@ docs/                 training pipeline notes, figures, and the script that gene
 
 ## Acknowledgements
 
-This work was done during the **Summer Research Internship (SURI) 2026** at the Ira A. Fulton Schools of Engineering, Arizona State University (selected as one of 30 from 1500+ applicants), under the mentorship of **Prof. Vikram Kodibagkar**. Training ran on ASU Research Computing. Basis sets were simulated with [MRSCloud](https://doi.org/10.1002/mrm.29370). The unsupervised ConvNet baseline is from [Shamaei et al.](https://github.com/isi-nmr/Deep-MRS-Quantification).
+This work was done during the **Summer Research Internship (SURI) 2026** at the Ira A. Fulton Schools of Engineering, Arizona State University (selected as one of 30 from 1500+ applicants), under the mentorship of **Prof. Vikram Kodibagkar**. Training ran on ASU Research Computing. Basis sets were simulated with [MRSCloud](https://doi.org/10.1002/mrm.29370). The unsupervised ConvNet baseline is from [Shamaei et al.](https://www.biorxiv.org/content/10.1101/2022.10.13.512064v1).
