@@ -143,6 +143,9 @@ flowchart LR
 
 ## Repository
 
+> [!NOTE]
+> **About the code.** Most of this project's codebase, including the data simulation and the training and evaluation of all six models, is stored on **ASU's supercomputer**, where the experiments were run. I no longer have access to it, so this repository contains the **results I had saved on my own machine** (metrics, plots, heat maps and the poster), together with my **MATLAB basis-set analysis**. The training pipeline is described step by step in [`docs/pipeline.md`](docs/pipeline.md).
+
 ```
 basis_set_analysis/   MATLAB: per-peak area / per-proton analysis, rescaling and plots (+ the basis sets they read)
 results/basis_set/    tables produced by the basis-set analysis

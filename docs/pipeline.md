@@ -2,6 +2,9 @@
 
 The machine-learning benchmark was run on Arizona State University's research computing cluster, in two software environments (TensorFlow 2.15 and PyTorch 2.1, both on GPU).
 
+> [!NOTE]
+> The scripts below are stored on ASU's supercomputer, and I no longer have access to it, so they are not included in this repository. This page documents the workflow, and the results I had saved locally are in [`results/ml_benchmark/`](../results/ml_benchmark).
+
 ```mermaid
 flowchart TD
     A["1 · prepare_data.py<br/>simulate spectra from the corrected basis set<br/>(SNR mix of 15 / 20 / 25 dB)"] --> B["2 · main.py<br/>train the unsupervised ConvNet (PyTorch)"]
