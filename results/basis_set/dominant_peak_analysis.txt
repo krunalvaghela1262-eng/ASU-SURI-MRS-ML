@@ -1,0 +1,13 @@
+==================== DOMINANT PEAK MRS ANALYSIS ====================
+      Metabolite                         Peak                      Protons    Area_Magnitude_peaks_segmented    Peak_Height    Area_per_peak_Per_Proton    T2  Ratio_Area_Proton_to_Exp
+
+    {'choline'    }    {'N-(CH3)3 (3.19-3.22 ppm)'            }       9                   4.0231                   1.1782               0.44702             265             0.65194         
+    {'creatine'   }    {'N-CH3 (3.03 ppm)'                    }       3                   1.4567                  0.42115               0.48555             147             0.95868         
+    {'creatine'   }    {'N-CH2 (3.91-3.94 ppm)'               }       2                  0.94138                  0.27819               0.47069             147             0.92933         
+    {'lactate'    }    {'CH3 doublet (1.31 ppm)'              }       3                  0.31293                  0.11695               0.10431             240             0.15823         
+    {'myoinositol'}    {'Ring CH main cluster (3.52-3.56 ppm)'}       4                  0.28981                 0.062146              0.072453             197             0.12037         
+    {'naa'        }    {'Acetyl CH3 (2.01 ppm)'               }       3                   1.3777                  0.38106               0.45924             258             0.67666         
+    {'water'      }    {'H2O singlet (~4.65-4.70 ppm)'        }       2                  0.88868                  0.26662               0.44434            83.7              1.4675         
+
+Saved successfully: PerPeak_Area_Results.csv / .mat
+>> 
