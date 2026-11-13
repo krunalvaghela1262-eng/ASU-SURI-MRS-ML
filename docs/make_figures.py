@@ -161,108 +161,139 @@ def basis_correction():
     plt.close(fig)
 
 
-# ------------------------------------------------------------------ metabolite maps (simulated whole-brain MRSI)
-# Tissue concentrations (mM, approximate literature values for healthy adult brain):
-#   creatine is higher in grey matter, choline higher in white matter, NAA similar in both; CSF ~ 0.
+# ------------------------------------------------------------------ metabolite maps (simulated MRSI, one axial slice)
+# Approximate healthy-adult concentrations (mM) per tissue (e.g. Pouwels & Frahm 1998; Gasparovic et al. 2006):
+#   creatine higher in grey matter, choline higher in white matter, NAA similar in both, CSF ~ 0.
 TISSUE_CONC = {          # (grey matter, white matter, CSF)
-    "NAA": (10.0, 9.0, 0.2),
-    "tCr": (8.0, 5.5, 0.2),
-    "tCho": (1.5, 2.0, 0.05),
+    "NAA": (10.0, 9.0, 0.3),
+    "Cr": (8.0, 5.5, 0.2),
+    "PCh": (1.5, 2.1, 0.05),
 }
-MAP_MAX = {"NAA": 12.0, "tCr": 10.0, "tCho": 2.6}
-MAP_LABEL = {"NAA": "NAA", "tCr": "tCr", "tCho": "tCho"}
+MAP_MAX = {"NAA": 11.0, "Cr": 9.0, "PCh": 2.4}
+MAP_NAME = {"NAA": "NAA", "Cr": "Creatine (tCr)", "PCh": "Choline (tCho)"}
 
 
-def simulate_mrsi(block=3, noise=0.03, seed=11):
-    """Metabolite maps from the MNI152 tissue probability maps, at MRSI-like resolution (block × 2 mm voxels)."""
+def simulate_slice(z_mm=16.0, psf_mm=3.0):
+    """One axial slice of simulated MRSI maps on the 1 mm MNI152 template.
+
+    Each voxel's concentration is the tissue-weighted mix of grey matter, white matter and CSF
+    (partial volume), blurred by a Gaussian point-spread function like a real MRSI acquisition.
+    """
     from nilearn import datasets
-    t1 = datasets.load_mni152_template(resolution=2).get_fdata()
-    gm = datasets.load_mni152_gm_template(resolution=2).get_fdata()
-    wm = datasets.load_mni152_wm_template(resolution=2).get_fdata()
-    mask = datasets.load_mni152_brain_mask(resolution=2).get_fdata() > 0.5
-    gm, wm = np.clip(gm, 0, 1), np.clip(wm, 0, 1)
+    from scipy.ndimage import gaussian_filter
+    t1i = datasets.load_mni152_template(resolution=1)
+    k = int(round((np.linalg.inv(t1i.affine) @ [0, 0, z_mm, 1])[2]))
+    get = lambda img: img.get_fdata()[:, :, k]
+    t1 = get(t1i)
+    gm = np.clip(get(datasets.load_mni152_gm_template(resolution=1)), 0, 1)
+    wm = np.clip(get(datasets.load_mni152_wm_template(resolution=1)), 0, 1)
+    mask = get(datasets.load_mni152_brain_mask(resolution=1)) > 0.5
     csf = np.clip(mask - gm - wm, 0, 1)
     tot = np.maximum(gm + wm + csf, 1e-6)
-    rng = np.random.default_rng(seed)
-
-    def blocky(v):
-        """Average over block³ voxels (MRSI point-spread), then repeat back to 2 mm for display."""
-        s = [d - d % block for d in v.shape]
-        v = v[:s[0], :s[1], :s[2]]
-        b = v.reshape(s[0] // block, block, s[1] // block, block, s[2] // block, block).mean(axis=(1, 3, 5))
-        return np.repeat(np.repeat(np.repeat(b, block, 0), block, 1), block, 2), s
-
+    rot = lambda a: np.rot90(a)                      # anterior at the top, as radiologists view it
     maps = {}
-    for k, (c_gm, c_wm, c_csf) in TISSUE_CONC.items():
-        conc = (gm * c_gm + wm * c_wm + csf * c_csf) / tot * mask
-        m, s = blocky(conc)
-        m = m * (1 + noise * rng.standard_normal(m.shape))
-        maps[k] = m
-    cover, s = blocky(mask.astype(float))
-    t1 = t1[:s[0], :s[1], :s[2]]
-    # Like a real whole-brain MRSI slab, skip the skull base (cerebellum / brainstem) where lipids and
-    # susceptibility artefacts spoil spectra: those regions show plain anatomy.
-    z = np.arange(s[2])[None, None, :]
-    return t1, maps, (cover > 0.5) & (z >= int(0.36 * s[2]))
+    for key, (cg, cw, cc) in TISSUE_CONC.items():
+        conc = (gm * cg + wm * cw + csf * cc) / tot * mask
+        maps[key] = rot(gaussian_filter(conc, psf_mm))
+    alpha = rot(np.clip(gaussian_filter(mask.astype(float), 1.5) * 1.6 - 0.3, 0, 1))
+    return rot(t1), maps, alpha, rot(gm), rot(wm), rot(csf * mask)
 
 
 def metabolite_maps_gif():
-    t1, maps, cover = simulate_mrsi()
-    nx, ny, nz = t1.shape
+    t1, maps, alpha, gm, wm, csf = simulate_slice()
+    H, Wd = t1.shape
+    # cursor path (row, col in the displayed slice): frontal cortex -> white matter -> frontal horn of the
+    # lateral ventricle -> thalamus -> posterior white matter -> occipital cortex
+    way = np.array([(38, 72), (66, 76), (98, 86), (116, 88), (140, 80), (170, 70), (205, 74)], float)
+    seg = np.r_[0, np.cumsum(np.hypot(*np.diff(way, axis=0).T))]
+    s = np.linspace(0, seg[-1], 44)
+    path = np.c_[np.interp(s, seg, way[:, 0]), np.interp(s, seg, way[:, 1])]
+    path = np.r_[path, path[-2:0:-1]]                # there and back, so the loop is seamless
+
+    def sample(img, r, c):
+        from scipy.ndimage import map_coordinates
+        return float(map_coordinates(img, [[r], [c]], order=1)[0])
+
+    def tissue(r, c):
+        from scipy.ndimage import distance_transform_edt
+        g, w, f = sample(gm, r, c), sample(wm, r, c), sample(csf, r, c)
+        depth = sample(distance_transform_edt(alpha > 0.5), r, c)      # mm below the brain surface
+        if f > 0.5:
+            return "ventricle (CSF)"
+        if g > 0.55:
+            return "cortex (grey matter)" if depth < 22 else "deep grey matter (thalamus / caudate)"
+        if w > 0.55:
+            return "white matter"
+        return "grey / white matter boundary"
+
+    keys = ("NAA", "Cr", "PCh")
+    # crop to the brain so it fills the panels
+    rows, cols = np.where(alpha > 0.05)
+    r0, r1, c0, c1 = rows.min() - 4, rows.max() + 5, cols.min() - 4, cols.max() + 5
+    crop = lambda a: a[r0:r1, c0:c1]
+    t1, alpha, gm, wm, csf = map(crop, (t1, alpha, gm, wm, csf))
+    maps = {k: crop(v) for k, v in maps.items()}
+    path = path - [r0, c0]
+
     cmap = matplotlib.colormaps["turbo"]
-    n_frames = 36
-    phase = np.sin(np.linspace(0, 2 * np.pi, n_frames, endpoint=False))
-    pos = {"axial": (nz * 0.57 + nz * 0.15 * phase).astype(int),
-           "coronal": (ny * 0.56 + ny * 0.16 * phase).astype(int),
-           "sagittal": (nx * 0.50 - nx * 0.20 * np.abs(phase)).astype(int)}
-
-    def cut(vol, view, i):
-        if view == "axial":
-            return np.rot90(vol[:, :, i])
-        if view == "coronal":
-            return np.rot90(vol[:, i, :])
-        return np.rot90(vol[i, :, :])
-
-    mets = list(TISSUE_CONC)
-    views = ("axial", "coronal", "sagittal")
-    fig = plt.figure(figsize=(10.5, 9.6), dpi=72, facecolor="black")
-    gs = fig.add_gridspec(3, 5, width_ratios=[0.42, 1, 1, 1.18, 0.07], left=0.01, right=0.95, top=0.9,
-                          bottom=0.06, wspace=0.04, hspace=0.06)
-    axes = [[fig.add_subplot(gs[r, c + 1]) for c in range(3)] for r in range(3)]
-    cax = [fig.add_subplot(gs[r, 4]) for r in range(3)]
-    for r, k in enumerate(mets):
-        lab = fig.add_subplot(gs[r, 0]); lab.axis("off")
-        lab.text(0.95, 0.5, MAP_LABEL[k], color="white", fontsize=22, weight="bold", ha="right", va="center")
-        sm = matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(0, MAP_MAX[k]), cmap=cmap)
-        cb = fig.colorbar(sm, cax=cax[r])
-        cb.set_label("[mM]", color="white", fontsize=11)
-        cb.ax.tick_params(colors="white", labelsize=9)
+    fig = plt.figure(figsize=(14, 5.6), dpi=72, facecolor="black")
+    gs = fig.add_gridspec(2, 4, width_ratios=[1, 1, 1, 1.45], height_ratios=[1, 0.045], left=0.01, right=0.985,
+                          top=0.86, bottom=0.15, wspace=0.06, hspace=0.05)
+    axm = [fig.add_subplot(gs[0, i]) for i in range(3)]
+    for i, k in enumerate(keys):
+        ax = axm[i]
+        ax.imshow(t1, cmap="gray", interpolation="bilinear")
+        rgba = cmap(np.clip(maps[k] / MAP_MAX[k], 0, 1))
+        rgba[..., 3] = 0.6 * alpha
+        ax.imshow(rgba, interpolation="bilinear")
+        ax.set_title(MAP_NAME[k], color="white", fontsize=14, weight="bold")
+        ax.axis("off")
+        cb = fig.colorbar(matplotlib.cm.ScalarMappable(matplotlib.colors.Normalize(0, MAP_MAX[k]), cmap),
+                          cax=fig.add_subplot(gs[1, i]), orientation="horizontal")
+        cb.set_label("concentration (mM)", color="#c9ced6", fontsize=9)
+        cb.ax.tick_params(colors="#c9ced6", labelsize=8)
         cb.outline.set_edgecolor("#4b5563")
-    title = fig.text(0.02, 0.955, "", color="white", fontsize=15, weight="bold")
-    fig.text(0.02, 0.015, "Simulated from the MNI152 template's grey/white-matter maps with literature concentrations "
-             "(not patient data).", color="#9ca3af", fontsize=9)
+    trail = [ax.plot([], [], color="white", lw=1, alpha=0.5)[0] for ax in axm]
+    dots = [ax.plot([], [], "o", ms=11, mfc="none", mec="white", mew=2.2)[0] for ax in axm]
 
-    def draw(f):
-        for r, k in enumerate(mets):
-            for c, v in enumerate(views):
-                ax = axes[r][c]
-                ax.clear(); ax.axis("off"); ax.set_facecolor("black")
-                i = pos[v][f]
-                ax.imshow(cut(t1, v, i), cmap="gray", interpolation="bilinear")
-                m = np.ma.masked_where(~cut(cover, v, i), cut(maps[k], v, i))
-                ax.imshow(m, cmap=cmap, vmin=0, vmax=MAP_MAX[k], alpha=0.78, interpolation="nearest")
-                if r == 0:
-                    ax.set_title(v, color="#c9d4ff", fontsize=13)
-        z_mm = (pos["axial"][f] - nz / 2) * 2
-        title.set_text(f"Whole-brain metabolite maps  ·  sweeping through the brain  (axial z ≈ {z_mm:+.0f} mm)")
+    axs = fig.add_subplot(gs[0, 3])
+    gm_ref = {k: TISSUE_CONC[k][0] for k in keys}
+    def fid_of(conc):
+        return sum(conc[k] * fids[k] for k in keys) * np.exp(-6 * t)
+    ref = np.real(spectrum(fid_of(gm_ref)))[band]
+    wm_spec = np.real(spectrum(fid_of({k: TISSUE_CONC[k][1] for k in keys})))[band]
+    top = 1.15 * max(ref.max(), wm_spec.max())
+    axs.set_facecolor("black")
+    axs.plot(ppm[band], ref, color="#6b7280", lw=1, label="typical grey matter")
+    line, = axs.plot(ppm[band], ref, color="#ffc627", lw=2, label="spectrum at the cursor")
+    axs.set_xlim(4.0, 1.0); axs.set_ylim(-0.06 * top, top); axs.set_yticks([])
+    for k, p, yy in (("NAA", 2.01, 0.92), ("Cr", 3.0, 0.92), ("Cho", 3.24, 0.80)):
+        axs.text(p, yy * top, k, ha="center", color="white", fontsize=12, weight="bold")
+    axs.tick_params(colors="#c9ced6")
+    for sp in axs.spines.values():
+        sp.set_color("#4b5563")
+    axs.set_xlabel("chemical shift (ppm)", color="#c9ced6")
+    axs.legend(loc="center left", fontsize=10, facecolor="black", edgecolor="#4b5563", labelcolor="white")
+    readout = axs.text(0.02, 1.03, "", transform=axs.transAxes, color="white", fontsize=12, family="monospace")
+    title = fig.text(0.01, 0.94, "", color="white", fontsize=15, weight="bold")
+    fig.text(0.01, 0.02, "Simulated MRSI on one axial slice of the MNI152 standard brain (z = +16 mm): partial-volume "
+             "grey/white-matter/CSF mix with literature concentrations, ~7 mm resolution. Not patient data.",
+             color="#9ca3af", fontsize=9)
 
     from PIL import Image
     frames = []
-    for f in range(n_frames):                      # render frames ourselves: opaque black, no GIF transparency
-        draw(f)
+    for f, (r, c) in enumerate(path):
+        conc = {k: sample(maps[k], r, c) for k in keys}
+        line.set_ydata(np.real(spectrum(fid_of(conc)))[band])
+        lo = max(0, f - 8)
+        for d, tr in zip(dots, trail):
+            d.set_data([c], [r])
+            tr.set_data(path[lo:f + 1, 1], path[lo:f + 1, 0])
+        readout.set_text(f"NAA {conc['NAA']:4.1f}   tCr {conc['Cr']:4.1f}   tCho {conc['PCh']:3.1f}  mM")
+        title.set_text(f"MR spectroscopic imaging: one spectrum per location  ·  cursor in {tissue(r, c)}")
         fig.canvas.draw()
         frames.append(Image.fromarray(np.asarray(fig.canvas.buffer_rgba())[..., :3]).quantize(colors=255))
-    frames[0].save(OUT / "metabolite_maps.gif", save_all=True, append_images=frames[1:], duration=170, loop=0,
+    frames[0].save(OUT / "metabolite_maps.gif", save_all=True, append_images=frames[1:], duration=110, loop=0,
                    optimize=True)
     plt.close(fig)
 

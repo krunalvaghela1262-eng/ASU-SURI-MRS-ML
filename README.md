@@ -28,19 +28,19 @@
 
 ### Why it matters
 
-With **MR spectroscopic imaging (MRSI)**, a spectrum is recorded in thousands of small voxels across the brain. Quantifying every one of them gives **whole-brain metabolite maps**, so the quantifier has to be both accurate and fast.
+With **MR spectroscopic imaging (MRSI)**, a spectrum is recorded at every location in the brain, and each one has to be quantified. That turns thousands of spectra into **metabolite maps**, so the quantifier has to be both accurate and fast.
 
-The maps follow brain anatomy. In a healthy brain:
-- **creatine (tCr)** is higher in grey matter, so the cortex stands out
+Follow the white circle in the animation. As it moves from the frontal cortex through white matter, the thalamus, a ventricle and out to the occipital cortex, the spectrum on the right and its numbers change:
+- **creatine (tCr)** is higher in grey matter, so the cortex and thalamus are warmer in its map
 - **choline (tCho)** is higher in white matter
 - **NAA** is spread fairly evenly through brain tissue
-- the fluid-filled ventricles are dark in all three
+- **in the ventricle** (fluid) all three peaks almost vanish, which is why the ventricles show up blue
 
-Clinicians look for regions that break these patterns. In a tumour, for example, NAA drops and choline rises.
+Clinicians look for regions that break these normal patterns. In a tumour, for example, NAA drops and choline rises.
 
 <p align="center">
-  <img src="docs/figures/metabolite_maps.gif" alt="Whole-brain metabolite maps of NAA, creatine and choline in axial, coronal and sagittal views" width="88%">
-  <br><sub><i>Simulated whole-brain MRSI (not patient data). Each voxel's concentration comes from the grey-matter / white-matter / fluid mix of the MNI152 standard brain, using literature concentrations. Voxels are ~6 mm with a little noise, and the skull base is left out as in a real acquisition. The slices sweep through the brain.</i></sub>
+  <img src="docs/figures/metabolite_maps.gif" alt="MRSI animation: NAA, creatine and choline maps on an axial brain slice with a moving cursor and its live spectrum" width="100%">
+  <br><sub><i>Simulated MRSI on one axial slice (z = +16 mm) of the MNI152 standard brain, not patient data. Each location's concentrations come from its grey-matter / white-matter / fluid mix with literature values, blurred to a realistic ~7 mm resolution. The spectrum is built from this project's basis sets.</i></sub>
 </p>
 
 ---
